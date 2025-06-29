@@ -112,6 +112,9 @@ class RealTescoScraper:
             # Try to add price data
             self._enrich_with_price_data(products, html_content)
             
+            # Filter out products without real data
+            products = [p for p in products if self._is_valid_product(p)]
+            
         except Exception as e:
             print(f"❌ Error extracting product data: {e}")
         
@@ -203,7 +206,7 @@ class RealTescoScraper:
                         price_val = numeric_prices[i]
                         product['price'] = f"£{price_val:.2f}"
                         
-                        # Calculate unit price (rough estimate)
+                        # Calculate unit price from product name
                         if 'kg' in product['name'].lower():
                             weight_match = re.search(r'(\d+\.?\d*)kg', product['name'].lower())
                             if weight_match:
@@ -217,7 +220,7 @@ class RealTescoScraper:
                                 unit_price = (price_val / weight_g) * 100
                                 product['unit_price'] = f"£{unit_price:.2f}/100g"
             
-            # Set realistic nutrition data based on product type
+            # Add nutrition data based on food category (using standard values)
             for product in products:
                 product['nutrition'] = self._get_realistic_nutrition(product['name'])
                 
@@ -225,13 +228,14 @@ class RealTescoScraper:
             print(f"⚠️ Error enriching price data: {e}")
     
     def _get_realistic_nutrition(self, product_name: str) -> Dict[str, str]:
-        """Get realistic nutrition data based on product type."""
+        """Get nutrition data based on product type using standard nutritional values."""
         name_lower = product_name.lower()
         
+        # Use standard nutritional values per 100g for common food categories
         if 'chicken' in name_lower:
             return {
                 'energy': '106kcal',
-                'protein': '23.1g',
+                'protein': '23.1g', 
                 'carbs': '0g',
                 'fat': '1.9g',
                 'salt': '0.22g'
@@ -240,7 +244,7 @@ class RealTescoScraper:
             return {
                 'energy': '46kcal',
                 'protein': '3.4g',
-                'carbs': '4.8g',
+                'carbs': '4.8g', 
                 'fat': '1.7g',
                 'salt': '0.13g'
             }
@@ -255,19 +259,15 @@ class RealTescoScraper:
         elif 'rice' in name_lower:
             return {
                 'energy': '349kcal',
-                'protein': '7.9g',
+                'protein': '7.9g', 
                 'carbs': '77.8g',
                 'fat': '0.6g',
                 'salt': '0.01g'
             }
         else:
-            return {
-                'energy': '150kcal',
-                'protein': '10g',
-                'carbs': '15g',
-                'fat': '5g',
-                'salt': '0.5g'
-            }
+            # Return empty dict if we can't determine the food type
+            # This forces the agent to look for real nutrition data
+            return {}
 
 
 @tool
