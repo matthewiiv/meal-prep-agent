@@ -29,8 +29,7 @@ def analyze_user_preferences(user_input: str) -> Dict[str, Any]:
     }
 
 
-# Import the real Tesco API tools
-from .tesco_api import search_tesco_products, get_tesco_product_details
+# Tesco tools are imported in agent_v2.py
 
 
 @tool
