@@ -1,0 +1,80 @@
+TESCO SCRAPER TEST RESULTS
+==================================================
+Test Date: 2025-06-29 22:46:54
+
+QUERY: 'chicken breast' (limit: 3)
+Nutrition extraction: NO
+Products found: 3
+----------------------------------------
+1. Tesco British Chicken Breast Fillets 650G
+   Price: Price not available
+   Brand: TESCO
+   URL: https://www.tesco.com/groceries/en-GB/products/294007923
+
+2. Tesco British Chicken Breast Fillets 950G
+   Price: Price not available
+   Brand: TESCO
+   URL: https://www.tesco.com/groceries/en-GB/products/292284222
+
+3. Tesco Chicken Breast Fillets 320g
+   Price: Price not available
+   Brand: TESCO
+   URL: https://www.tesco.com/groceries/en-GB/products/320661079
+
+
+QUERY: 'milk' (limit: 2)
+Nutrition extraction: NO
+Products found: 2
+----------------------------------------
+1. Biotiful Gut Health Kefir Drink - Vanilla 1L
+   Price: Price not available
+   Brand: BIO-TIFUL DAIRY LTD
+   URL: https://www.tesco.com/groceries/en-GB/products/312697728
+
+2. Biotiful Gut Health Kefir Drink Original 1 Litre
+   Price: Price not available
+   Brand: BIO-TIFUL DAIRY LTD
+   URL: https://www.tesco.com/groceries/en-GB/products/305965589
+
+
+QUERY: 'bread' (limit: 2)
+Nutrition extraction: NO
+Products found: 2
+----------------------------------------
+1. Tesco White Toastie Bread Thick Sliced 800g
+   Price: Price not available
+   Brand: TESCO
+   URL: https://www.tesco.com/groceries/en-GB/products/299425748
+
+2. Hovis Soft White Medium Sliced Bread 800g
+   Price: Price not available
+   Brand: HOVIS
+   URL: https://www.tesco.com/groceries/en-GB/products/256174499
+
+
+QUERY: 'eggs' (limit: 2)
+Nutrition extraction: NO
+Products found: 2
+----------------------------------------
+1. Tesco Large Free Range Eggs 12 Pack
+   Price: Price not available
+   Brand: TESCO
+   URL: https://www.tesco.com/groceries/en-GB/products/260298456
+
+2. Tesco Medium Free Range Eggs 12 Pack
+   Price: Price not available
+   Brand: TESCO
+   URL: https://www.tesco.com/groceries/en-GB/products/260298462
+
+
+QUERY: 'chicken breast' (limit: 1)
+Nutrition extraction: YES
+Products found: 1
+----------------------------------------
+1. Tesco British Chicken Breast Fillets 650G
+   Price: Price not available
+   Brand: TESCO
+   URL: https://www.tesco.com/groceries/en-GB/products/294007923
+   Nutrition: No data found
+
+

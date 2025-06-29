@@ -16,8 +16,9 @@ from langchain_core.tools import tool
 class RealTescoScraper:
     """A scraper that actually extracts real product data from Tesco's GraphQL responses."""
     
-    def __init__(self):
+    def __init__(self, extract_nutrition: bool = False):
         self.base_url = "https://www.tesco.com"
+        self.extract_nutrition = extract_nutrition
         self.session = requests.Session()
         
         # Use mobile headers that work
@@ -102,7 +103,7 @@ class RealTescoScraper:
                         'promotion': '',
                         'availability': True,
                         'brand': brand,
-                        'nutrition': self._get_realistic_nutrition(title),
+                        'nutrition': {},
                         'product_id': product_id,
                         'tpnc': tpnc
                     }
@@ -220,58 +221,193 @@ class RealTescoScraper:
                                 unit_price = (price_val / weight_g) * 100
                                 product['unit_price'] = f"£{unit_price:.2f}/100g"
             
-            # Add nutrition data based on food category (using standard values)
-            for product in products:
-                product['nutrition'] = self._get_realistic_nutrition(product['name'])
+            # Get real nutrition data if enabled
+            if self.extract_nutrition:
+                print("🔬 Extracting nutrition data from product pages...")
+                for product in products:
+                    if not product.get('nutrition'):
+                        product['nutrition'] = self._get_real_nutrition(product['url'])
+            else:
+                print("⏭️ Skipping nutrition extraction (disabled)")
                 
         except Exception as e:
             print(f"⚠️ Error enriching price data: {e}")
     
-    def _get_realistic_nutrition(self, product_name: str) -> Dict[str, str]:
-        """Get nutrition data based on product type using standard nutritional values."""
-        name_lower = product_name.lower()
-        
-        # Use standard nutritional values per 100g for common food categories
-        if 'chicken' in name_lower:
-            return {
-                'energy': '106kcal',
-                'protein': '23.1g', 
-                'carbs': '0g',
-                'fat': '1.9g',
-                'salt': '0.22g'
-            }
-        elif 'milk' in name_lower:
-            return {
-                'energy': '46kcal',
-                'protein': '3.4g',
-                'carbs': '4.8g', 
-                'fat': '1.7g',
-                'salt': '0.13g'
-            }
-        elif 'bread' in name_lower:
-            return {
-                'energy': '247kcal',
-                'protein': '8.7g',
-                'carbs': '45.8g',
-                'fat': '2.2g',
-                'salt': '1.0g'
-            }
-        elif 'rice' in name_lower:
-            return {
-                'energy': '349kcal',
-                'protein': '7.9g', 
-                'carbs': '77.8g',
-                'fat': '0.6g',
-                'salt': '0.01g'
-            }
-        else:
-            # Return empty dict if we can't determine the food type
-            # This forces the agent to look for real nutrition data
+    def _is_valid_product(self, product: Dict[str, Any]) -> bool:
+        """Check if a product has valid data."""
+        return (
+            product.get('name') and 
+            len(product['name']) > 5 and
+            product.get('product_id') and
+            product.get('url')
+        )
+    
+    def _get_real_nutrition(self, product_url: str) -> Dict[str, str]:
+        """Visit the actual product page and extract real nutrition data."""
+        try:
+            print(f"🔍 Getting nutrition data from: {product_url}")
+            
+            # Add delay to be respectful
+            time.sleep(random.uniform(1, 3))
+            
+            response = self.session.get(product_url, timeout=15)
+            response.raise_for_status()
+            
+            # Check if we got blocked or minimal response
+            if len(response.text) < 5000:
+                print("⚠️ Got minimal response, might be blocked")
+                return {}
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            nutrition_data = {}
+            
+            # Strategy 1: Look for nutrition list with specific classes
+            nutrition_list = soup.find('dl', class_=re.compile(r'nutritional-info-list', re.I))
+            if nutrition_list:
+                nutrition_text = nutrition_list.get_text()
+                print(f"🔍 Found nutrition text: {nutrition_text[:300]}...")
+                
+                # Parse specific values using improved regex patterns based on actual Tesco data
+                # Energy (kcal) - pattern: "115kcal"
+                energy_match = re.search(r'(\d+\.?\d*)\s*kcal', nutrition_text, re.I)
+                if energy_match:
+                    nutrition_data['energy'] = f"{energy_match.group(1)}kcal"
+                
+                # Fat - pattern: "Fat 3.3g" (avoiding Saturates)
+                fat_match = re.search(r'Fat\s+(\d+\.?\d*)\s*g', nutrition_text, re.I)
+                if fat_match:
+                    nutrition_data['fat'] = f"{fat_match.group(1)}g"
+                
+                # Salt - pattern: "Salt 0.18g"
+                salt_match = re.search(r'Salt\s+(\d+\.?\d*)\s*g', nutrition_text, re.I)
+                if salt_match:
+                    nutrition_data['salt'] = f"{salt_match.group(1)}g"
+                
+                print(f"✅ Parsed from nutrition list: {nutrition_data}")
+            
+            # Strategy 1.5: Also look for nutrition table data which contains protein and carbs
+            tables = soup.find_all('table')
+            table_text = ""
+            for table in tables:
+                if 'nutrition' in table.get_text().lower() or 'protein' in table.get_text().lower():
+                    table_text = table.get_text()
+                    print(f"🔍 Found nutrition table: {table_text[:200]}...")
+                    break
+            
+            # If we found table text, extract protein and carbs from it
+            if table_text:
+                # Protein - pattern: "Protein21.5g" (no space in table format)
+                protein_match = re.search(r'Protein\s*(\d+\.?\d*)\s*g', table_text, re.I)
+                if protein_match:
+                    nutrition_data['protein'] = f"{protein_match.group(1)}g"
+                
+                # Carbohydrate - pattern: "Carbohydrate0g"
+                carb_match = re.search(r'Carbohydrate\s*(\d+\.?\d*)\s*g', table_text, re.I)
+                if carb_match:
+                    nutrition_data['carbs'] = f"{carb_match.group(1)}g"
+                
+                # Also try to get energy, fat, salt from table if not found yet
+                if not nutrition_data.get('energy'):
+                    energy_match = re.search(r'(\d+\.?\d*)\s*kcal', table_text, re.I)
+                    if energy_match:
+                        nutrition_data['energy'] = f"{energy_match.group(1)}kcal"
+                
+                if not nutrition_data.get('fat'):
+                    fat_match = re.search(r'Fat(\d+\.?\d*)\s*g', table_text, re.I)
+                    if fat_match:
+                        nutrition_data['fat'] = f"{fat_match.group(1)}g"
+                
+                if not nutrition_data.get('salt'):
+                    salt_match = re.search(r'Salt(\d+\.?\d*)\s*g', table_text, re.I)
+                    if salt_match:
+                        nutrition_data['salt'] = f"{salt_match.group(1)}g"
+                
+                print(f"✅ Enhanced from table: {nutrition_data}")
+            
+            # Strategy 2: Look for nutrition table
+            if not nutrition_data:
+                tables = soup.find_all('table')
+                for table in tables:
+                    table_text = table.get_text().lower()
+                    if any(word in table_text for word in ['nutrition', 'energy', 'protein', 'kcal']):
+                        rows = table.find_all('tr')
+                        
+                        for row in rows:
+                            cells = row.find_all(['td', 'th'])
+                            if len(cells) >= 2:
+                                key = cells[0].get_text().strip().lower()
+                                value = cells[1].get_text().strip()
+                                
+                                if 'energy' in key and 'kcal' in value:
+                                    kcal_match = re.search(r'(\d+)\s*kcal', value)
+                                    if kcal_match:
+                                        nutrition_data['energy'] = f"{kcal_match.group(1)}kcal"
+                                elif 'fat' in key and key == 'fat':  # Avoid saturated fat
+                                    fat_match = re.search(r'(\d+\.?\d*)\s*g', value)
+                                    if fat_match:
+                                        nutrition_data['fat'] = f"{fat_match.group(1)}g"
+                                elif 'carbohydrate' in key:
+                                    carb_match = re.search(r'(\d+\.?\d*)\s*g', value)
+                                    if carb_match:
+                                        nutrition_data['carbs'] = f"{carb_match.group(1)}g"
+                                elif 'protein' in key:
+                                    protein_match = re.search(r'(\d+\.?\d*)\s*g', value)
+                                    if protein_match:
+                                        nutrition_data['protein'] = f"{protein_match.group(1)}g"
+                                elif 'salt' in key:
+                                    salt_match = re.search(r'(\d+\.?\d*)\s*g', value)
+                                    if salt_match:
+                                        nutrition_data['salt'] = f"{salt_match.group(1)}g"
+                        
+                        if nutrition_data:  # Found nutrition in this table
+                            break
+            
+            if nutrition_data:
+                print(f"✅ Found nutrition data: {nutrition_data}")
+            else:
+                print("❌ No nutrition data found on product page")
+            
+            return nutrition_data
+            
+        except Exception as e:
+            print(f"❌ Error getting nutrition data: {e}")
             return {}
+    
+    def _extract_nutrition_from_json(self, data: Any) -> Dict[str, str]:
+        """Extract nutrition data from JSON-LD or other structured data."""
+        nutrition = {}
+        
+        if isinstance(data, dict):
+            for key, value in data.items():
+                if key.lower() == 'nutrition' and isinstance(value, dict):
+                    for nutrient, amount in value.items():
+                        if nutrient.lower() in ['energy', 'calories']:
+                            nutrition['energy'] = str(amount)
+                        elif nutrient.lower() == 'protein':
+                            nutrition['protein'] = str(amount)
+                        elif nutrient.lower() in ['carbohydrate', 'carbs']:
+                            nutrition['carbs'] = str(amount)
+                        elif nutrient.lower() == 'fat':
+                            nutrition['fat'] = str(amount)
+                        elif nutrient.lower() == 'salt':
+                            nutrition['salt'] = str(amount)
+                elif isinstance(value, (dict, list)):
+                    # Recursively search nested structures
+                    nested_nutrition = self._extract_nutrition_from_json(value)
+                    if nested_nutrition:
+                        nutrition.update(nested_nutrition)
+        
+        elif isinstance(data, list):
+            for item in data:
+                nested_nutrition = self._extract_nutrition_from_json(item)
+                if nested_nutrition:
+                    nutrition.update(nested_nutrition)
+        
+        return nutrition
 
 
 @tool
-def search_tesco_products_real(query: str, limit: int = 5) -> List[Dict[str, Any]]:
+def search_tesco_products_real(query: str, limit: int = 5, extract_nutrition: bool = False) -> List[Dict[str, Any]]:
     """
     Search for products on Tesco.com using real data extraction from their GraphQL cache.
     This extracts actual product titles, IDs, and other data embedded in the page.
@@ -279,12 +415,13 @@ def search_tesco_products_real(query: str, limit: int = 5) -> List[Dict[str, Any
     Args:
         query: Search term (e.g., "chicken breast", "organic vegetables")
         limit: Maximum number of products to return (default: 5)
+        extract_nutrition: Whether to visit individual product pages for nutrition data (default: False)
         
     Returns:
         List of real products with extracted data from Tesco
     """
     try:
-        scraper = RealTescoScraper()
+        scraper = RealTescoScraper(extract_nutrition=extract_nutrition)
         products = scraper.search_products(query, limit)
         
         if not products:

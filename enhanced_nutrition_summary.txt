@@ -1,0 +1,39 @@
+ENHANCED TESCO NUTRITION EXTRACTION RESULTS
+============================================================
+Test Date: 2025-06-29 22:55:14
+
+QUERY: 'chicken breast' (limit: 2)
+Products found: 2
+--------------------------------------------------
+1. Tesco British Chicken Breast Fillets 650G
+   Brand: TESCO
+   URL: https://www.tesco.com/groceries/en-GB/products/294007923
+   NUTRITION DATA FOUND:
+     Energy: 115kcal
+     Salt: 0.18g
+
+2. Tesco British Chicken Breast Fillets 950G
+   Brand: TESCO
+   URL: https://www.tesco.com/groceries/en-GB/products/292284222
+   NUTRITION DATA FOUND:
+     Energy: 115kcal
+     Salt: 0.18g
+
+QUERY: 'milk' (limit: 1)
+Products found: 1
+--------------------------------------------------
+1. Biotiful Gut Health Kefir Drink - Vanilla 1L
+   Brand: BIO-TIFUL DAIRY LTD
+   URL: https://www.tesco.com/groceries/en-GB/products/312697728
+   Nutrition: No data extracted
+
+QUERY: 'bread' (limit: 1)
+Products found: 1
+--------------------------------------------------
+1. Tesco White Toastie Bread Thick Sliced 800g
+   Brand: TESCO
+   URL: https://www.tesco.com/groceries/en-GB/products/299425748
+   NUTRITION DATA FOUND:
+     Energy: 120kcal
+     Salt: 0.42g
+
