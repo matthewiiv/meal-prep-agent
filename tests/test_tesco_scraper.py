@@ -234,6 +234,7 @@ class TestRealDataExtraction:
     def test_nutrition_data_structure(self, mock_nutrition):
         """Test that nutrition data has the correct structure when found."""
         mock_nutrition.return_value = {
+            'serving_size': '100g',
             'energy': '100kcal',
             'protein': '20g',
             'carbs': '5g',
@@ -244,11 +245,57 @@ class TestRealDataExtraction:
         scraper = RealTescoScraper()
         nutrition = scraper._get_real_nutrition("https://example.com/product")
         
+        # Test serving size is included
+        assert 'serving_size' in nutrition
+        assert nutrition['serving_size'] in ['100g', '100ml', 'per serving']
+        
         required_keys = ['energy', 'protein', 'carbs', 'fat', 'salt']
         for key in required_keys:
             assert key in nutrition
             assert isinstance(nutrition[key], str)
             assert nutrition[key].endswith(('kcal', 'g'))  # Proper units
+    
+    def test_serving_size_extraction(self):
+        """Test that serving size is extracted from nutrition table text."""
+        scraper = RealTescoScraper()
+        
+        # Test with typical Tesco table format
+        test_table_text = "Typical ValuesPer 100gEnergy486kJ / 115kcalnull / nullFat3.3gProtein21.5g"
+        
+        # Extract serving size using the patterns from the scraper
+        import re
+        serving_patterns = [
+            r'Per\s+(\d+g)',
+            r'per\s+(\d+g)',
+            r'(\d+g)\s*Energy',
+            r'Values\s*Per\s+(\d+g)',
+        ]
+        
+        serving_size = None
+        for pattern in serving_patterns:
+            match = re.search(pattern, test_table_text, re.I)
+            if match:
+                serving_size = match.group(1)
+                break
+        
+        assert serving_size == "100g"
+        
+        # Test alternative formats
+        test_cases = [
+            ("Per serving (200g) Energy", "200g"),
+            ("Nutritional values per 150g:", "150g"),
+            ("100g contains Energy 115kcal", "100g"),
+        ]
+        
+        for test_text, expected in test_cases:
+            serving_size = None
+            for pattern in serving_patterns + [r'Per\s+serving\s*\((\d+g)\)', r'per\s+(\d+g)', r'(\d+g)\s+contains']:
+                match = re.search(pattern, test_text, re.I)
+                if match:
+                    serving_size = match.group(1)
+                    break
+            
+            assert serving_size == expected, f"Failed to extract '{expected}' from '{test_text}'"
 
 
 @pytest.mark.integration

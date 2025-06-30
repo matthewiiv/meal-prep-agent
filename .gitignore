@@ -190,3 +190,8 @@ cython_debug/
 Network Trash Folder
 Temporary Items
 .apdisk
+
+# Local data files
+tesco_nutrition_cache.json
+*.csv
+debug_*.html

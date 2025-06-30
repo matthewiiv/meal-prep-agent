@@ -11,6 +11,7 @@ from urllib.parse import quote_plus, urljoin
 import requests
 from bs4 import BeautifulSoup
 from langchain_core.tools import tool
+from .nutrition_cache import get_cached_nutrition, cache_nutrition
 
 
 class RealTescoScraper:
@@ -226,7 +227,8 @@ class RealTescoScraper:
                 print("🔬 Extracting nutrition data from product pages...")
                 for product in products:
                     if not product.get('nutrition'):
-                        product['nutrition'] = self._get_real_nutrition(product['url'])
+                        nutrition = self._get_real_nutrition_with_name(product['url'], product['name'])
+                        product['nutrition'] = nutrition
             else:
                 print("⏭️ Skipping nutrition extraction (disabled)")
                 
@@ -242,8 +244,29 @@ class RealTescoScraper:
             product.get('url')
         )
     
+    def _get_real_nutrition_with_name(self, product_url: str, product_name: str) -> Dict[str, str]:
+        """Get nutrition data with proper product name for caching."""
+        
+        # Check cache first
+        cached_nutrition = get_cached_nutrition(product_url, product_name)
+        if cached_nutrition:
+            return cached_nutrition
+        
+        # Extract nutrition and cache with proper name
+        nutrition_data = self._get_real_nutrition_raw(product_url)
+        
+        if nutrition_data:
+            cache_nutrition(product_url, product_name, nutrition_data)
+        
+        return nutrition_data
+    
     def _get_real_nutrition(self, product_url: str) -> Dict[str, str]:
-        """Visit the actual product page and extract real nutrition data."""
+        """Backward compatibility method."""
+        return self._get_real_nutrition_with_name(product_url, "")
+    
+    def _get_real_nutrition_raw(self, product_url: str) -> Dict[str, str]:
+        """Visit the actual product page and extract real nutrition data (no caching)."""
+        
         try:
             print(f"🔍 Getting nutrition data from: {product_url}")
             
@@ -258,10 +281,23 @@ class RealTescoScraper:
                 print("⚠️ Got minimal response, might be blocked")
                 return {}
             
+            
             soup = BeautifulSoup(response.text, 'html.parser')
             nutrition_data = {}
             
-            # Strategy 1: Look for nutrition list with specific classes
+            # Strategy 1: Extract serving size from specific HTML elements (more reliable than regex)
+            # Primary method: Look for the Guideline Daily Amounts serving size display
+            serving_size_element = soup.find('div', class_='ILAuM5ZwahtJKTg')
+            if serving_size_element:
+                serving_text = serving_size_element.get_text().strip()
+                print(f"🎯 Found serving size element: '{serving_text}'")
+                # Extract just the size part (e.g., "Per 125g" -> "125g")
+                serving_match = re.search(r'(\d+g)', serving_text)
+                if serving_match:
+                    nutrition_data['serving_size'] = serving_match.group(1)
+                    print(f"📏 Extracted serving size: {serving_match.group(1)}")
+            
+            # Strategy 2: Look for nutrition list with specific classes for nutrition values
             nutrition_list = soup.find('dl', class_=re.compile(r'nutritional-info-list', re.I))
             if nutrition_list:
                 nutrition_text = nutrition_list.get_text()
@@ -296,6 +332,28 @@ class RealTescoScraper:
             
             # If we found table text, extract protein and carbs from it
             if table_text:
+                # Fallback: Extract serving size from table headers if not already found
+                if not nutrition_data.get('serving_size'):
+                    # Look for nutrition table with proper structure
+                    nutrition_table = soup.find('table', class_=re.compile(r'product__info-table|RNEGJ486p9x6dl0', re.I))
+                    if nutrition_table:
+                        # Get the third column header (actual serving size, not 100g reference)
+                        headers = nutrition_table.find('thead')
+                        if headers:
+                            th_elements = headers.find_all('th')
+                            if len(th_elements) >= 3:
+                                third_header = th_elements[2].get_text().strip()
+                                print(f"🔍 Found table header: '{third_header}'")
+                                serving_match = re.search(r'(\d+g)', third_header)
+                                if serving_match:
+                                    nutrition_data['serving_size'] = serving_match.group(1)
+                                    print(f"📏 Extracted serving size from table header: {serving_match.group(1)}")
+                    
+                    # Final fallback if still no serving size found
+                    if not nutrition_data.get('serving_size'):
+                        nutrition_data['serving_size'] = "100g"
+                        print(f"📏 No serving size found, defaulting to: 100g")
+                
                 # Protein - pattern: "Protein21.5g" (no space in table format)
                 protein_match = re.search(r'Protein\s*(\d+\.?\d*)\s*g', table_text, re.I)
                 if protein_match:
@@ -323,6 +381,11 @@ class RealTescoScraper:
                         nutrition_data['salt'] = f"{salt_match.group(1)}g"
                 
                 print(f"✅ Enhanced from table: {nutrition_data}")
+            
+            # If we still don't have serving size but have nutrition data, default to 100g
+            if nutrition_data and not nutrition_data.get('serving_size'):
+                nutrition_data['serving_size'] = "100g"
+                print(f"📏 Adding default serving size: 100g")
             
             # Strategy 2: Look for nutrition table
             if not nutrition_data:

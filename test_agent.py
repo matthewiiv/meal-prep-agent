@@ -1,16 +1,16 @@
 """
-Test the full meal prep agent with free Tesco scraper.
+Test the simple meal prep agent with o3 reasoning model.
 """
 
 import os
 from dotenv import load_dotenv
-from meal_prep_agent.agent_v2 import MealPrepAgent
+from meal_prep_agent.simple_agent import run_meal_prep_agent
 
 # Load environment variables
 load_dotenv()
 
 def test_agent():
-    """Test the meal prep agent with real user input."""
+    """Test the simple meal prep agent with o3 reasoning model."""
     
     # Check if OpenAI API key is set
     if not os.getenv("OPENAI_API_KEY"):
@@ -19,17 +19,14 @@ def test_agent():
         print("Add: OPENAI_API_KEY=your_openai_key_here")
         return
     
-    print("🤖 Testing Meal Prep Agent with Free Tesco Scraper")
+    print("🧠 Testing Simple Meal Prep Agent with o3 Reasoning Model")
     print("=" * 60)
     
-    # Create agent
-    agent = MealPrepAgent()
-    
-    # Test queries
+    # Test queries - focused on meal planning
     test_queries = [
-        "I want high-protein meal prep for this week. I have 30 minutes max per meal to cook.",
-        "Find me some chicken breast options from Tesco",
-        "Create a simple recipe using chicken and vegetables"
+        "Hi! I'd like a meal prep plan for this week. Can you create 4 candidate recipes and pick the best 2?",
+        "I want bold flavors with beef and rice, staying under £3 per meal",
+        "Create a cheese-heavy recipe with chicken (not thighs) that fits my macro targets"
     ]
     
     for i, query in enumerate(test_queries, 1):
@@ -37,27 +34,16 @@ def test_agent():
         print("-" * 50)
         
         try:
-            # Run the agent
-            result = agent.run(query, thread_id=f"test_{i}")
-            
-            # Print the conversation
-            print("💬 Conversation:")
-            for message in result["messages"]:
-                if hasattr(message, 'content'):
-                    # Determine message type
-                    if hasattr(message, 'tool_calls') and message.tool_calls:
-                        print(f"🤖 AGENT: {message.content}")
-                        print(f"   🔧 Called {len(message.tool_calls)} tool(s)")
-                        for tool_call in message.tool_calls:
-                            print(f"      - {tool_call['name']}")
-                    elif message.content:
-                        speaker = "👤 USER" if "HumanMessage" in str(type(message)) else "🤖 AGENT"
-                        print(f"{speaker}: {message.content}")
+            print("🤖 Agent Response:")
+            response = run_meal_prep_agent(query)
+            print(response)
             
             print(f"\n✅ Test {i} completed successfully!")
             
         except Exception as e:
             print(f"❌ Test {i} failed: {e}")
+            import traceback
+            traceback.print_exc()
         
         print("\n" + "="*60)
     
@@ -71,11 +57,9 @@ def interactive_test():
         print("❌ OPENAI_API_KEY not found!")
         return
     
-    print("🍽️ Interactive Meal Prep Agent")
+    print("🍽️ Interactive Meal Prep Agent (o3 Reasoning)")
     print("Type 'quit' to exit")
-    print("=" * 40)
-    
-    agent = MealPrepAgent()
+    print("=" * 50)
     
     while True:
         user_input = input("\n👤 You: ").strip()
@@ -88,20 +72,14 @@ def interactive_test():
             continue
         
         try:
-            result = agent.run(user_input)
-            
-            # Print agent's last response
-            if result.get("messages"):
-                last_message = result["messages"][-1]
-                if hasattr(last_message, 'content') and last_message.content:
-                    print(f"🤖 Agent: {last_message.content}")
-                    
-                    # Show if tools were used
-                    if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
-                        print(f"   🔧 Used tools: {[tc['name'] for tc in last_message.tool_calls]}")
+            print("\n🤖 Agent:")
+            response = run_meal_prep_agent(user_input)
+            print(response)
         
         except Exception as e:
             print(f"❌ Error: {e}")
+            import traceback
+            traceback.print_exc()
 
 
 if __name__ == "__main__":
