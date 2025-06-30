@@ -11,6 +11,7 @@ from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
 
 from .tesco_real import search_tesco_products_real
+from .tesco_simple import search_tesco_products_simple
 
 # System prompt adapted from your GPT
 MEAL_PREP_SYSTEM_PROMPT = """You are a meal prep planning expert that creates customized weekly meal-prep plans using real Tesco products and pricing.
@@ -62,7 +63,7 @@ def create_meal_prep_agent():
     
     # Initialize the LLM with tools - using reasoning model
     llm = ChatOpenAI(model="o3", temperature=1.0)
-    tools = [search_tesco_products_real]
+    tools = [search_tesco_products_simple]
     llm_with_tools = llm.bind_tools(tools)
     
     # Create tool node

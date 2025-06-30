@@ -21,32 +21,67 @@ class RealTescoScraper:
         self.base_url = "https://www.tesco.com"
         self.extract_nutrition = extract_nutrition
         self.session = requests.Session()
+        self._setup_session()
+    
+    def _setup_session(self):
+        """Setup session with realistic browser characteristics."""
+        # Use more realistic browser headers to avoid detection
+        user_agents = [
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/120.0'
+        ]
         
-        # Use mobile headers that work
+        import random
+        selected_ua = random.choice(user_agents)
+        
         self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-GB,en;q=0.5',
-            'Accept-Encoding': 'gzip, deflate',
+            'User-Agent': selected_ua,
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'en-GB,en;q=0.9,en-US;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
             'Connection': 'keep-alive',
             'Upgrade-Insecure-Requests': '1',
             'Sec-Fetch-Dest': 'document',
             'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'none'
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'Cache-Control': 'max-age=0',
+            'DNT': '1'
         })
+        
+        # Initialize session by visiting homepage first
+        try:
+            print("🌐 Initializing session with Tesco homepage...")
+            homepage_response = self.session.get(self.base_url, timeout=15)
+            if homepage_response.status_code == 200:
+                print("✅ Session initialized successfully")
+            else:
+                print(f"⚠️ Homepage returned status: {homepage_response.status_code}")
+        except Exception as e:
+            print(f"⚠️ Failed to initialize session: {e}")
     
     def search_products(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
         """Search for products on Tesco.com and extract real data."""
         print(f"🔍 Searching Tesco for: '{query}'")
         
         try:
-            # Be respectful with delays
-            time.sleep(random.uniform(2, 4))
+            # Much longer delays to avoid pattern detection
+            time.sleep(random.uniform(10, 20))
             
             search_url = f"{self.base_url}/groceries/en-GB/search?query={quote_plus(query)}"
             print(f"🌐 Fetching: {search_url}")
             
-            response = self.session.get(search_url, timeout=15)
+            # Add referrer and additional anti-detection measures
+            headers = {
+                'Referer': 'https://www.tesco.com/',
+                'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+                'Sec-Ch-Ua-Mobile': '?0',
+                'Sec-Ch-Ua-Platform': '"macOS"'
+            }
+            
+            response = self.session.get(search_url, timeout=20, headers=headers)
             response.raise_for_status()
             
             print(f"✅ Got response: {response.status_code}")
@@ -270,15 +305,36 @@ class RealTescoScraper:
         try:
             print(f"🔍 Getting nutrition data from: {product_url}")
             
-            # Add delay to be respectful
-            time.sleep(random.uniform(1, 3))
+            # Much longer delay for nutrition pages
+            time.sleep(random.uniform(15, 30))
             
-            response = self.session.get(product_url, timeout=15)
+            # Add referrer for product pages too
+            headers = {
+                'Referer': 'https://www.tesco.com/groceries/en-GB/search',
+                'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+                'Sec-Ch-Ua-Mobile': '?0',
+                'Sec-Ch-Ua-Platform': '"macOS"'
+            }
+            
+            response = self.session.get(product_url, timeout=20, headers=headers)
             response.raise_for_status()
             
             # Check if we got blocked or minimal response
             if len(response.text) < 5000:
                 print("⚠️ Got minimal response, might be blocked")
+                return {}
+            
+            # Check for 403 Forbidden or other blocking indicators
+            if "Access Denied" in response.text or "blocked" in response.text.lower():
+                print("🚫 Access denied or blocked by Tesco")
+                # Save a sample of the response for debugging
+                with open("debug_blocked_response.html", "w") as f:
+                    f.write(response.text[:5000])
+                print("💾 Saved blocked response sample for debugging")
+                return {}
+            
+            if response.status_code == 403:
+                print("🚫 403 Forbidden - temporarily blocked by Tesco")
                 return {}
             
             
